@@ -1,25 +1,37 @@
 import { Request, Response } from "express";
 import { getCustomRepository } from "typeorm";
 import { UserRepo } from "../repositories/UserRepo";
+import * as yup from 'yup';
 
 export class UserController {
     async create(request:Request, response:Response) {
-        const usersRepository = getCustomRepository(UserRepo)
+        const usersRepository = getCustomRepository(UserRepo);
+
+        const { name } = request.body;
+
+        const schema = yup.object().shape({
+            name: yup.string().required("Name required!")
+        });
 
         try {
-            const { name } = request.body;
+
+            try {
+                await schema.validate(request.body, {abortEarly: false});
+            } catch (err) {
+                return response.json({error:err});
+            }
 
             const user = usersRepository.create({
                 name
-            })
+            });
 
-            await usersRepository.save(user)
+            await usersRepository.save(user);
 
-            return response.status(201).json(user)
+            return response.status(201).json(user);
 
 
         } catch (error) {
-            return response.status(400).json({error:error})
+            return response.status(400).json({error:error});
         }
     }
 
@@ -49,11 +61,22 @@ export class UserController {
 
         const id = request.params.id 
         const { name } = request.body
+
+        const schema = yup.object().shape({
+            name: yup.string().required("Name required!")
+        });
+
         const user = await usersRepository.findOne(id)
 
         try {
             if(user) {
-                await usersRepository.update(user, {
+                try {
+                    await schema.validate(request.body, {abortEarly: false});
+                } catch (err) {
+                    return response.json({error:err});
+                }
+                
+                await usersRepository.update(id, {
                     name
                 })
 

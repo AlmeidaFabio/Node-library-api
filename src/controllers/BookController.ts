@@ -1,24 +1,32 @@
 import { Request, Response,  } from "express";
 import { getCustomRepository } from "typeorm";
-import { Book } from "../database/entities/Book";
 import { BookRepo } from "../repositories/BookRepo";
+import * as yup from 'yup';
 
 export class BookController {
     async create(request:Request, response:Response) {
-        const bookRepositories = getCustomRepository(BookRepo)
+        const bookRepositories = getCustomRepository(BookRepo);
+        const { name } = request.body;
+
+        const code = Math.random().toString(36).substr(2, 5);
+
+        const schema = yup.object().shape({
+            name: yup.string().required("Name required!"),
+        });
 
         try {
-            const { name } = request.body
+            try {
+                await schema.validate(request.body, {abortEarly: false});
+            } catch (err) {
+                return response.json({error:err});
+            }
 
-            const code = Math.random().toString(36).substr(2, 5);
+            const book = bookRepositories.create({
+                name,
+                code
+            })
 
-            const book = await bookRepositories.createQueryBuilder()
-            .insert()
-            .into(Book)
-            .values([
-                {name: name, code:code}
-            ])
-            .execute()
+            await bookRepositories.save(book);
 
             return response.status(201).json(book)
         } catch (error) {
@@ -32,18 +40,18 @@ export class BookController {
         const id = request.params.id
 
         try {
-            if(id) {
-                const book = await booksRepository.createQueryBuilder("book")
-                .where("book.id = :id", { id: id })
-                .getOne();
+            if(!id) {
+                const books = await booksRepository.find()
+
+                return response.json(books)
+
+            } else if(id) {
+                const book = await booksRepository.findOne(id)
 
                 return response.json(book)
 
             } else {
-                const books = await booksRepository.createQueryBuilder("books")
-                .getMany();
-
-                return response.json(books)
+                return response.json({error:"Book does not exist!"})
             }
 
         } catch (error) {
@@ -57,15 +65,24 @@ export class BookController {
         const { name } = request.body
         const id = request.params.id 
 
+        const schema = yup.object().shape({
+            name: yup.string().required("Name required!"),
+        });
+
+        try {
+            await schema.validate(request.body, {abortEarly: false});
+        } catch (err) {
+            return response.json({error:err});
+        }
+
         try {
             const book = await booksrepository.findOne(id)
 
             if(book) {
-                await booksrepository.createQueryBuilder()
-                .update(Book)
-                .set({name: name})
-                .where("id = :id", {id: id})
-                .execute()
+                await booksrepository.update(id, {
+                    name
+                })
+
             } else {
                 return response.json({error: "This book does not exist!"})
             }
@@ -86,11 +103,7 @@ export class BookController {
             const book = await booksRepository.findOne(id)
 
             if(book) {
-                await booksRepository.createQueryBuilder()
-                .delete()
-                .from(Book)
-                .where("id = :id", {id:id})
-                .execute()
+                await booksRepository.delete(id)
 
                 return response.json({message: "Deleted successfully!"})
             } else {
